@@ -3,6 +3,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler, LabelBinarizer
 import pandas as pd
 import glob, os
+from pathlib import Path
 from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 from sklearn.base import TransformerMixin
@@ -43,11 +44,25 @@ class Standard_Scaler(TransformerMixin):
         return X
     
 def har1():
+    dataset_dir = Path(__file__).resolve().parent
+    x_train_path = dataset_dir / 'X_train.npy'
+    x_test_path = dataset_dir / 'X_test.npy'
+    y_train_path = dataset_dir / 'y_train.npy'
+    y_test_path = dataset_dir / 'y_test.npy'
+
+    if not all(path.exists() for path in [x_train_path, x_test_path, y_train_path, y_test_path]):
+        raise FileNotFoundError(
+            "HAR Experiment-1 currently needs preprocessed NumPy files "
+            "(X_train.npy, X_test.npy, y_train.npy, y_test.npy) in the HAR/ folder. "
+            "The downloaded Experiment-1 directory contains raw .pcap files and MATLAB scripts, "
+            "which this Python loader does not preprocess yet."
+        )
+
     # Load the data
-    X_train = np.load('./HAR/X_train.npy')
-    X_test = np.load('./HAR/X_test.npy')
-    y_train = np.load('./HAR/y_train.npy')
-    y_test = np.load('./HAR/y_test.npy')
+    X_train = np.load(x_train_path)
+    X_test = np.load(x_test_path)
+    y_train = np.load(y_train_path)
+    y_test = np.load(y_test_path)
 
     label_encoder = LabelEncoder()
     y_train_encoded = label_encoder.fit_transform(y_train)
@@ -66,7 +81,7 @@ def reading_file(activity_csv):
     results = []
     for i in range(len(activity_csv)):
         df = pd.read_csv(activity_csv[i])
-        results.append(df.values)  
+        results.append(df.values.astype(np.float32))  
     return results
 #function for labeling the samples 
 def label(activity, label):
@@ -76,19 +91,19 @@ def label(activity, label):
     return np.array(list_y).reshape(-1, 1) 
 
 def har3():
-    #Read Dataset
-    path = "./data" #set path
-    os.chdir(path) 
-    results = pd.DataFrame([])
-    list_file = glob.glob("*.csv") #lisiting all the csv file samples
-    #print(list_file)
- 
+    dataset_dir = Path(__file__).resolve().parent / 'Experiment-3' / 'Data'
+    if not dataset_dir.exists():
+        raise FileNotFoundError(
+            f"HAR Experiment-3 data folder not found: {dataset_dir}"
+        )
 
-    empty_csv = [i for i in list_file if i.startswith('Empty')] #list for empty csv files 
-    lying_csv = [i for i in list_file if i.startswith('Lying')] #list for lying csv files 
-    sitting_csv = [i for i in list_file if i.startswith('Sitting')] #list for sitting csv files 
-    standing_csv = [i for i in list_file if i.startswith('Standing')] #list for satnding csv files 
-    walking_csv = [i for i in list_file if i.startswith('Walking')] #list for walking csv files 
+    list_file = [path.name for path in dataset_dir.glob("*.csv")]
+
+    empty_csv = [str(dataset_dir / i) for i in list_file if i.startswith('Empty')] #list for empty csv files 
+    lying_csv = [str(dataset_dir / i) for i in list_file if i.startswith('Lying')] #list for lying csv files 
+    sitting_csv = [str(dataset_dir / i) for i in list_file if i.startswith('Sitting')] #list for sitting csv files 
+    standing_csv = [str(dataset_dir / i) for i in list_file if i.startswith('Standing')] #list for satnding csv files 
+    walking_csv = [str(dataset_dir / i) for i in list_file if i.startswith('Walking')] #list for walking csv files 
 
     #calling reading_file function  
     empty = reading_file(empty_csv) 
@@ -113,11 +128,11 @@ def har3():
 
     #randomize the sample 
 
-    data, label = shuffle(data_X, data_y)
+    data, labels = shuffle(data_X, data_y)
 
     label_binarizer = LabelBinarizer()
-    label = label_binarizer.fit_transform(label)
-    X_train, X_test, y_train, y_test = train_test_split(data, label, test_size=0.20, random_state=42)
+    labels = label_binarizer.fit_transform(labels)
+    X_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.20, random_state=42)
 
     sc = Standard_Scaler()
     X_train = sc.fit_transform(X_train)

@@ -1,13 +1,12 @@
 import numpy as np
+from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelBinarizer
 
 def stanfi():
-    file_path = './data_labels.npz'  
-
-    with np.load(file_path) as data_file:
-        data = data_file['data']
-        labels = data_file['labels']
+    dataset_dir = Path(__file__).resolve().parent
+    data = np.load(dataset_dir / 'data_amp_2000.npy')
+    labels = np.load(dataset_dir / 'label_2000.npy')
 
     X_train, X_test, y_train, y_test = train_test_split(data, labels,test_size=0.2, random_state=42)
     X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, random_state=42) # 0.25 x 0.8 = 0.2

@@ -2,12 +2,14 @@ import scipy.io as sio
 import torch
 import torch.nn as nn
 import numpy as np
+from pathlib import Path
 from sklearn.preprocessing import StandardScaler, LabelBinarizer
 from sklearn.model_selection import train_test_split
 
 def signfi():
-    csi_lab =sio.loadmat('dataset_lab_276_dl.mat')
-    csi_home =sio.loadmat('dataset_home_276.mat')
+    dataset_dir = Path(__file__).resolve().parent
+    csi_lab =sio.loadmat(dataset_dir / 'dataset_lab_276_dl.mat')
+    csi_home =sio.loadmat(dataset_dir / 'dataset_home_276.mat')
 
     data_lab = csi_lab['csid_lab']
     label_lab = csi_lab['label_lab']
