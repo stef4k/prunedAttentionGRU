@@ -2,3 +2,6 @@ ARIL/
 HAR/
 SignFi/
 StanFi/
+*.pyc
+logs/
+__pycache__/

@@ -18,6 +18,8 @@ DATASETS = {
     "stanfi": {"loader": stanfi, "input_size": 90, "num_classes": 6},
 }
 
+SKIPPABLE_MISSING_DATASETS = {"har-1"}
+
 
 def build_smoke_loaders(dataset_name: str, batch_size: int, max_train_samples: int, max_test_samples: int):
     dataset_cfg = DATASETS[dataset_name]
@@ -123,6 +125,7 @@ def main():
 
     passed = []
     failed = []
+    skipped = []
 
     for dataset_name in args.datasets:
         try:
@@ -137,6 +140,14 @@ def main():
                 max_test_samples=args.max_test_samples,
             )
             passed.append(dataset_name)
+        except FileNotFoundError as exc:
+            if dataset_name in SKIPPABLE_MISSING_DATASETS:
+                skipped.append(dataset_name)
+                print(f"{dataset_name}: SKIPPED because required dataset artifacts are missing: {exc}", flush=True)
+            else:
+                failed.append(dataset_name)
+                print(f"{dataset_name}: FAILED with {exc.__class__.__name__}: {exc}", flush=True)
+                print(traceback.format_exc(), flush=True)
         except Exception as exc:
             failed.append(dataset_name)
             print(f"{dataset_name}: FAILED with {exc.__class__.__name__}: {exc}", flush=True)
@@ -144,6 +155,7 @@ def main():
 
     print("\n===== Smoke test summary =====", flush=True)
     print(f"Passed: {passed}", flush=True)
+    print(f"Skipped: {skipped}", flush=True)
     print(f"Failed: {failed}", flush=True)
 
     if failed:
