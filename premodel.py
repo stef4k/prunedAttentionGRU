@@ -80,12 +80,21 @@ def stanfisetting(batch_size):
     #Data Load
     X_train, y_train, X_test, y_test = stanfi()
 
-    #Data Augmentation
-    _,_,X_train_aug, _,_,y_train_aug = augmentation(X_train, y_train)
+    # StanFi has much longer sequences than the other datasets.
+    # Use a lighter augmentation profile to avoid host-memory OOM.
+    stanfi_batch_size = min(batch_size, 16)
+    if stanfi_batch_size != batch_size:
+        print(f"StanFi batch size capped to {stanfi_batch_size} for memory safety.")
+    _,_,X_train_aug, _,_,y_train_aug = augmentation(
+        X_train,
+        y_train,
+        num_noise_copies=0,
+        shifts=range(-2, 3),
+    )
 
     #Data Loader
-    train_loader = dataloader(X_train_aug,y_train_aug,batch_size)
-    test_loader = dataloader(X_test,y_test,batch_size)
+    train_loader = dataloader(X_train_aug,y_train_aug,stanfi_batch_size)
+    test_loader = dataloader(X_test,y_test,stanfi_batch_size)
 
     print("Data Loader setting is done!")
     

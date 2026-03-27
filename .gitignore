@@ -5,3 +5,4 @@ StanFi/
 *.pyc
 logs/
 __pycache__/
+results/
