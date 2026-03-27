@@ -88,8 +88,8 @@ def stanfisetting(batch_size):
     _,_,X_train_aug, _,_,y_train_aug = augmentation(
         X_train,
         y_train,
-        num_noise_copies=0,
-        shifts=range(-2, 3),
+        num_noise_copies=1,
+        shifts=list(range(-3, 0)) + list(range(1, 4)),
     )
 
     #Data Loader

@@ -24,7 +24,7 @@ def add_gaussian_noise(X_train, y_train, num_noise_copies=3):
         return X_train_tensor, y_train_tensor
 
     # #Gaussian noise add
-    noise_mu, noise_sigma = 0.0, 1.0
+    noise_mu, noise_sigma = 0.0, 0.01
     X_train_flat = X_train_np.reshape(-1, hid_dim)
     noisy_tensors = [X_train_tensor]
     for _ in range(num_noise_copies):
@@ -51,7 +51,7 @@ def shift(X_train, y_train, shifts=None):
     y_train_np = np.asarray(y_train, dtype=np.float32)
     augmented_data_fill = []
     if shifts is None:
-        shifts = range(-10, 10)
+        shifts = list(range(-10, 0)) + list(range(1, 11))
     shifts = list(shifts)
 
     if not shifts:

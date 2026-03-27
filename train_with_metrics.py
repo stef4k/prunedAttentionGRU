@@ -58,6 +58,12 @@ CSV_FIELDS = [
     "inference_latency_ms_per_sample",
     "inference_latency_ms_per_batch",
     "inference_throughput_samples_per_s",
+    "pre_training_time_s",
+    "fine_tuning_time_s",
+    "pruning_s",
+    "pruning_k",
+    "finetune_epochs",
+    "finetune_lr",
     "training_time_s",
     "evaluation_time_s",
     "total_runtime_s",
@@ -81,11 +87,18 @@ def sync_device(device: torch.device) -> None:
         torch.cuda.synchronize(device)
 
 
-def count_parameters(model: torch.nn.Module) -> tuple[int, int, int]:
-    total = sum(param.numel() for param in model.parameters())
-    trainable = sum(param.numel() for param in model.parameters() if param.requires_grad)
-    non_trainable = total - trainable
-    return total, trainable, non_trainable
+def count_nonzero_weights(model: torch.nn.Module) -> tuple[int, int, int]:
+    """Count non-zero weights excluding mask parameters (matches paper's parameter reporting)."""
+    total_nz = 0
+    trainable_nz = 0
+    for name, param in model.named_parameters():
+        if 'mask' in name:
+            continue
+        nz = int((param.data != 0).sum().item())
+        total_nz += nz
+        if param.requires_grad:
+            trainable_nz += nz
+    return total_nz, trainable_nz, total_nz - trainable_nz
 
 
 def save_history_plot(loss_hist: dict, acc_hist: dict, destination: Path) -> None:
@@ -274,9 +287,51 @@ def train_dataset(dataset_name: str, args, results_root: Path, device: torch.dev
             best_validation_accuracy = validation_metrics["accuracy"]
             best_state_dict = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
 
-    training_time = time.perf_counter() - training_started_at
+    pre_training_time = time.perf_counter() - training_started_at
 
+    # Load best pre-trained model
     model.load_state_dict(best_state_dict)
+
+    # --- Pruning + Fine-tuning phase ---
+    fine_tuning_time = 0.0
+    if args.finetune_epochs > 0:
+        print(f"\n=== Pruning model (s={args.pruning_s}, k={args.pruning_k}) ===", flush=True)
+        model.prune_by_std(args.pruning_s, args.pruning_k)
+
+        print(f"=== Fine-tuning for {args.finetune_epochs} epochs (lr={args.finetune_lr}) ===", flush=True)
+        optimizer_ft = torch.optim.Adam(model.parameters(), lr=args.finetune_lr)
+        scheduler_ft = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_ft, T_max=args.finetune_epochs)
+
+        best_state_dict = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+        best_ft_accuracy = float("-inf")
+
+        ft_started_at = time.perf_counter()
+        for epoch in range(args.finetune_epochs):
+            ft_train_loss, ft_train_accuracy = train_one_epoch(
+                model=model,
+                dataloader=train_loader,
+                criterion=criterion,
+                optimizer=optimizer_ft,
+                device=device,
+                mixup_probability=args.mixup_probability,
+            )
+            scheduler_ft.step()
+
+            ft_val_metrics = evaluate_model(model, validation_loader, criterion, device)
+            print(
+                f"[Fine-tune] Epoch {epoch + 1}/{args.finetune_epochs} "
+                f"train_loss={ft_train_loss:.4f} train_acc={ft_train_accuracy:.4f} "
+                f"val_loss={ft_val_metrics['loss']:.4f} val_acc={ft_val_metrics['accuracy']:.4f}",
+                flush=True,
+            )
+            if ft_val_metrics["accuracy"] > best_ft_accuracy:
+                best_ft_accuracy = ft_val_metrics["accuracy"]
+                best_state_dict = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+
+        fine_tuning_time = time.perf_counter() - ft_started_at
+        model.load_state_dict(best_state_dict)
+
+    training_time = pre_training_time + fine_tuning_time
 
     evaluation_started_at = time.perf_counter()
     train_metrics = evaluate_model(model, train_loader, criterion, device)
@@ -307,7 +362,7 @@ def train_dataset(dataset_name: str, args, results_root: Path, device: torch.dev
         validation_metrics["predictions"],
     )
 
-    total_parameters, trainable_parameters, non_trainable_parameters = count_parameters(model)
+    total_parameters, trainable_parameters, non_trainable_parameters = count_nonzero_weights(model)
 
     checkpoint_path = run_dir / "model.pt"
     torch.save(
@@ -357,6 +412,12 @@ def train_dataset(dataset_name: str, args, results_root: Path, device: torch.dev
         "inference_latency_ms_per_sample": inference_metrics["latency_ms_per_sample"],
         "inference_latency_ms_per_batch": inference_metrics["latency_ms_per_batch"],
         "inference_throughput_samples_per_s": inference_metrics["throughput_samples_per_s"],
+        "pre_training_time_s": pre_training_time,
+        "fine_tuning_time_s": fine_tuning_time,
+        "pruning_s": args.pruning_s,
+        "pruning_k": args.pruning_k,
+        "finetune_epochs": args.finetune_epochs,
+        "finetune_lr": args.finetune_lr,
         "training_time_s": training_time,
         "evaluation_time_s": evaluation_time,
         "total_runtime_s": time.perf_counter() - run_started_at,
@@ -395,6 +456,10 @@ def main():
     parser.add_argument("--mixup-probability", type=float, default=0.7)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--results-dir", type=str, default="results/training_jobs")
+    parser.add_argument("--pruning-s", type=float, default=0.9)
+    parser.add_argument("--pruning-k", type=float, default=0.7)
+    parser.add_argument("--finetune-epochs", type=int, default=10)
+    parser.add_argument("--finetune-lr", type=float, default=1e-4)
     args = parser.parse_args()
 
     set_seed(args.seed)
