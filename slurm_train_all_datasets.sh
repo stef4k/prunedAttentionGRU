@@ -21,11 +21,15 @@ if command -v nvidia-smi >/dev/null 2>&1; then
 fi
 
 python -u train_with_metrics.py \
-    --datasets aril har-1 har-3 signfi stanfi \
+    --datasets aril har-1 har-3 signfi \
     --batchsize 128 \
     --learningrate 1e-3 \
     --epochs 100 \
     --hidden-size 128 \
     --attention-dim 32 \
+    --pruning-s 0.9 \
+    --pruning-k 0.7 \
+    --finetune-epochs 10 \
+    --finetune-lr 1e-4 \
     --seed 42 \
     --results-dir results/training_jobs

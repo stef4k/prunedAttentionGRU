@@ -28,5 +28,9 @@ python -u train_with_metrics.py \
     --epochs 100 \
     --hidden-size 128 \
     --attention-dim 32 \
+    --pruning-s 0.9 \
+    --pruning-k 0.7 \
+    --finetune-epochs 10 \
+    --finetune-lr 1e-4 \
     --seed 42 \
     --results-dir "${RESULTS_DIR}"
