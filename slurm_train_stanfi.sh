@@ -25,7 +25,7 @@ python -u train_with_metrics.py \
     --datasets stanfi \
     --batchsize 16 \
     --learningrate 1e-3 \
-    --epochs 100 \
+    --epochs 77 \
     --hidden-size 128 \
     --attention-dim 32 \
     --pruning-s 0.9 \
